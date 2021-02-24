@@ -445,7 +445,16 @@ app.post('/create/user',async (req,res)=>{
             try {
                 let fechaActual = moment();
                 let newBody = {...req.body ,fechaAlta:  fechaActual.format(), vigenciaContrasena : fechaActual.add(3 , 'months').format().toString(), estatus :true };
+                var generator = require('generate-password');
 
+                var password = generator.generate({
+                    length: 8,
+                    numbers: true,
+                    symbols:true,
+                    lowercase:true,
+                    uppercase:true,
+                    strict:true
+                });
 
               await schemaUserCreate.concat(schemaUser).validate({ nombre : newBody.nombre,
                     apellidoUno : newBody.apellidoUno,
@@ -455,7 +464,7 @@ app.post('/create/user',async (req,res)=>{
                   telefono : newBody.telefono,
                   extension : newBody.extension,
                   usuario : newBody.usuario,
-                  constrasena : newBody.constrasena,
+                  constrasena : password,
                   sistemas : newBody.sistemas,
                   proveedorDatos : newBody.proveedorDatos,
                   estatus : newBody.estatus,
@@ -466,7 +475,32 @@ app.post('/create/user',async (req,res)=>{
                      delete newBody.passwordConfirmation;
                  }
 
-                  console.log(newBody);
+                 delete newBody.constrasena;
+                 newBody["constrasena"]=password;
+
+                const client = new SMTPClient({
+                    user: 'soporteportalpdn@gmail.com',
+                    password: 'pdndigital-2021',
+                    host: 'smtp.gmail.com',
+                    ssl: true,
+                });
+
+                const message = {
+                    text: 'Enviamos tu nueva contraseña del portal PDN',
+                    from: 'soporteportalpdn@gmail.com',
+                    to: newBody.correoElectronico,
+                    subject: 'Enviamos tu nueva contraseña del portal PDN',
+                    attachment: [
+                        { data: '<html>Buen día anexamos tu contraseña nueva para acceder al portal de la PDN. Contraseña:  <br><i><b><h3>'+password+'</h3></b></i></html>', alternative: true }
+                    ],
+                };
+
+                client.send(message, function (err, message) {
+                    if(err!=null){
+                        res.status(200).json({message : "Hay errores al enviar tu nueva contraseña.Ponte en contacto con el administrador." , Status : 500});
+                    }
+                });
+
                   const nuevoUsuario = new User(newBody);
                   let response;
                   response = await nuevoUsuario.save();
@@ -1149,7 +1183,7 @@ app.post('/resetpassword',async (req,res)=>{
         const message = {
             text: 'Enviamos tu nueva contraseña del portal PDN',
             from: 'soporteportalpdn@gmail.com',
-            to: 'franciscoramirezvalerio@gmail.com',
+            to: correo,
             subject: 'Enviamos tu nueva contraseña del portal PDN',
             attachment: [
                 { data: '<html>Buen día anexamos tu contraseña nueva para acceder al portal de la PDN. Contraseña:  <br><i><b><h3>'+password+'</h3></b></i></html>', alternative: true }
@@ -1163,7 +1197,7 @@ app.post('/resetpassword',async (req,res)=>{
             }
         });
 
-        //let respuesta= await User.updateOne({"correoElectronico": correo },{$set:{ "contrasena": password }});
+        let respuesta= await User.updateOne({correoElectronico: correo },{constrasena: password }).exec();
         res.status(200).json({message : "Se ha enviado tu nueva contraseña al correo electrónico proporcionado." , Status : 200});
 
         }catch (e) {
