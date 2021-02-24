@@ -5,6 +5,7 @@ import path from 'path';
 import * as Yup from 'yup';
 import User from './schemas/model.user';
 import {spicSchema} from './schemas/model.s2';
+import {ssancionadosSchema} from './schemas/model.s3s';
 import Provider from './schemas/model.proovedor';
 import Catalog from './schemas/model.catalog';
 import Bitacora from './schemas/model.bitacora';
@@ -32,6 +33,7 @@ const db = mongoose.connect('mongodb://'+process.env.USERMONGO+':'+process.env.P
 mongoose.set('useFindAndModify', false);
 
 let S2 = mongoose.connection.useDb("S2");
+let S3S = mongoose.connection.useDb("S3_Servidores");
 //let port = process.env.PORT || 7777;
 let app = express();
 app.use(
@@ -120,18 +122,18 @@ const schemaUserCreate = Yup.object().shape({
 });
 
 const schemaUser = Yup.object().shape({
-    nombre: Yup.string().matches(new RegExp("^['A-zÀ-ú ]*$"),'no se permiten números, ni cadenas vacias' ).required().trim(),
-    apellidoUno: Yup.string().matches(new RegExp('^[\'A-zÀ-ú ]*$'),'no se permiten números, ni cadenas vacias' ).required().trim(),
+    nombre: Yup.string().matches(new RegExp("^['A-zÀ-ú ]*$"),'no se permiten números, ni cadenas vacias' ).required("El campo nombre es requerido").trim(),
+    apellidoUno: Yup.string().matches(new RegExp('^[\'A-zÀ-ú ]*$'),'no se permiten números, ni cadenas vacias' ).required("El campo Primer apellido es requerido").trim(),
     apellidoDos: Yup.string().matches(new RegExp('^[\'A-zÀ-ú ]*$'),'no se permiten números, ni cadenas vacias' ).trim(),
-    cargo: Yup.string().matches(new RegExp('^[\'A-zÀ-ú ]*$'),'no se permiten números, ni cadenas vacias' ).required().trim(),
-    correoElectronico: Yup.string().required().email(),
-    telefono:  Yup.string().matches(new RegExp('^[0-9]{10}$'), 'Inserta un número de teléfono valido, 10 caracteres').required().trim(),
+    cargo: Yup.string().matches(new RegExp('^[\'A-zÀ-ú ]*$'),'no se permiten números, ni cadenas vacias' ).required("El campo Cargo es requerido").trim(),
+    correoElectronico: Yup.string().required("El campo Correo electrónico es requerido").email(),
+    telefono:  Yup.string().matches(new RegExp('^[0-9]{10}$'), 'Inserta un número de teléfono valido, 10 caracteres').required("El campo Número de teléfono es requerido").trim(),
     extension: Yup.string().matches(new RegExp('^[0-9]{0,10}$'), 'Inserta un número de extensión valido , maximo 10 caracteres').trim(),
-    usuario: Yup.string().matches(new RegExp('^[a-zA-Z0-9]{8,}$'),'Inserta al menos 8 caracteres, no se permiten caracteres especiales' ).required().trim(),
-    constrasena: Yup.string().matches(new RegExp('^(?=.*[0-9])(?=.*[!@#$%^&*()_+,.\\\\\\/;\':"-]).{8,}$'),'Inserta al menos 8 caracteres, al menos un número, almenos un caracter especial ' ).required().trim(),
-    sistemas: Yup.array().min(1).required(),
-    proveedorDatos: Yup.string().required(),
-    estatus: Yup.boolean().required()
+    usuario: Yup.string().matches(new RegExp('^[a-zA-Z0-9]{8,}$'),'Inserta al menos 8 caracteres, no se permiten caracteres especiales' ).required("El campo Nombre de usuario es requerido").trim(),
+    constrasena: Yup.string().matches(new RegExp('^(?=.*[0-9])(?=.*[!@#$%^&*()_+,.\\\\\\/;\':"-]).{8,}$'),'Inserta al menos 8 caracteres, al menos un número, almenos un caracter especial ' ).required("El campo Contraseña es requerido").trim(),
+    sistemas: Yup.array().min(1).required("El campo Sistemas aplicables es requerido"),
+    proveedorDatos: Yup.string().required("El campo Proveedor de datos es requerido"),
+    estatus: Yup.boolean().required("El campo Estatus es requerido")
 });
 
 
@@ -155,7 +157,12 @@ async function validateSchema(doc,schema,validacion){
         let objError={};
         let arrayErrors = result.errorsWithStringTypes();
         let textErrors;
-        objError["docId"]= doc[0].id;
+        if(Array.isArray(doc)){
+            objError["docId"]= doc[0].id;
+        }else{
+            console.log("validateSchema docId", doc.id);
+            objError["docId"]= doc.id;
+        }
         objError["valid"] =  arrayErrors.length === 0 ? true : false;
         objError["errorCount"]= arrayErrors.length;
 
@@ -178,7 +185,6 @@ async function validateSchema(doc,schema,validacion){
 
 app.post('/validateSchemaS2',async (req,res)=>{
     try {
-        var code = validateToken(req);
         var code = validateToken(req);
         var usuario=req.headers.usuario;
         if(code.code == 401){
@@ -239,7 +245,71 @@ app.post('/validateSchemaS2',async (req,res)=>{
                     console.log(e);
                 }
             }
+        }
+    }catch (e) {
+        console.log(e);
+    }
+});
 
+
+app.post('/validateSchemaS3S',async (req,res)=>{
+    try {
+        var code = validateToken(req);
+        if(code.code == 401){
+            res.status(401).json({code: '401', message: code.message});
+        }else if (code.code == 200){
+            let fileContents = fs.readFileSync(path.resolve(__dirname, '../src/resource/openapis3s.yaml'), 'utf8');
+            let data = yaml.safeLoad(fileContents);
+            let schemaResults = data.components.schemas.ssancionados.properties.results;
+            schemaResults.items.properties.tipoFalta =  data.components.schemas.tipoFalta;
+            schemaResults.items.properties.tipoSancion = data.components.schemas.tipoSancion;
+
+            let schemaS3S = schemaResults;
+
+            let validacion = new swaggerValidator.Handler();
+            let newdocument = req.body;
+            let respuesta=[];
+            let arrayDocuments=[];
+            let ids= [];
+            let c1=1;
+            if(Array.isArray(newdocument)){
+                for (let doc of newdocument){
+                    doc["id"]= c1.toString();
+                    c1++;
+                    respuesta.push(await validateSchema([doc],schemaS3S,validacion));
+                    ids.push(doc.id);
+                    arrayDocuments.push(doc);
+                }
+            }else{
+                newdocument["id"]= c1.toString();
+                c1++;
+                respuesta.push(await validateSchema([newdocument],schemaS3S,validacion));
+                arrayDocuments.push(newdocument);
+            }
+
+            let wasInvalid;
+
+            for(let val of respuesta){
+                if(!val.valid){
+                    wasInvalid= true;
+                }
+            }
+
+            if(wasInvalid){
+                res.status(200).json({message : "Error : La validación no fue exitosa" , Status : 500, response : respuesta});
+            }else{
+                //se insertan
+                try {
+                    let S3SModel = S3S.model('Ssancionados', ssancionadosSchema, 'ssancionados');
+                    let response;
+                    response = await Spic.insertMany(arrayDocuments);
+                    let detailObject= {};
+                    detailObject["numeroRegistros"]= arrayDocuments.length;
+                    res.status(200).json({message : "Se realizarón las inserciones correctamente", Status : 200 , response: response, detail: detailObject});
+                }catch (e) {
+                    console.log(e);
+                }
+            }
         }
     }catch (e) {
         console.log(e);
@@ -396,6 +466,7 @@ app.post('/create/user',async (req,res)=>{
                      delete newBody.passwordConfirmation;
                  }
 
+                  console.log(newBody);
                   const nuevoUsuario = new User(newBody);
                   let response;
                   response = await nuevoUsuario.save();
@@ -550,6 +621,35 @@ app.post('/insertS2Schema',async (req,res)=>{
     }
 });
 
+app.post('/listSchemaS3S',async (req,res)=> {
+    try {
+        var code = validateToken(req);
+        if(code.code == 401){
+            res.status(401).json({code: '401', message: code.message});
+        }else if (code.code == 200 ){
+            let sancionados =  S3S.model('Ssancionados', ssancionadosSchema, 'ssancionados');
+            let sortObj = req.body.sort  === undefined ? {} : req.body.sort;
+            let page = req.body.page === undefined ? 1 : req.body.page ;  //numero de pagina a mostrar
+            let pageSize = req.body.pageSize === undefined ? 10 : req.body.pageSize;
+            let query = req.body.query === undefined ? {} : req.body.query;
+
+            console.log({page :page , limit: pageSize, sort: sortObj, query: query});
+            const paginationResult = await sancionados.paginate(query, {page :page , limit: pageSize, sort: sortObj}).then();
+            let objpagination ={hasNextPage : paginationResult.hasNextPage, page:paginationResult.page, pageSize : paginationResult.limit, totalRows: paginationResult.totalDocs }
+            let objresults = paginationResult.docs;
+
+            let objResponse= {};
+            objResponse["pagination"] = objpagination;
+            objResponse["results"]= objresults;
+
+            res.status(200).json(objResponse);
+        }
+    }catch (e) {
+console.log(e);
+    }
+});
+
+
 app.post('/listSchemaS2',async (req,res)=> {
     try {
         var code = validateToken(req);
@@ -588,16 +688,73 @@ app.delete('/deleteRecordS2',async (req,res)=>{
         }else if (code.code == 200 ){
             if(req.body.request._id){
                 let Spic = S2.model('Spic',spicSchema, 'spic');
-               const deletedRecord =  await Spic
-                   .findByIdAndDelete( req.body.request._id)
-                   .catch(err => res.status(400).json({message : err.message , code: '400'})).then();
+                let deletedRecord;
+                let numRecords=0;
+                if(Array.isArray(req.body.request._id)){
+                    numRecords= req.body.request._id.length;
+                    deletedRecord =  await Spic
+                        .deleteMany({_id: {
+                        $in:req.body.request._id
+                    }})
+                        .catch(err => res.status(400).json({message : err.message , code: '400'})).then();
+                }else{
+                    numRecords=1;
+                    deletedRecord =  await Spic
+                        .findByIdAndDelete( req.body.request._id)
+                        .catch(err => res.status(400).json({message : err.message , code: '400'})).then();
+                }
+
                 bitacora["tipoOperacion"]="DELETE";
                 bitacora["fechaOperacion"]= moment().format();
                 bitacora["usuario"]=req.body.request.usuario;
-                bitacora["numeroRegistros"]=1;
+                bitacora["numeroRegistros"]=numRecords;
                 bitacora["sistema"]="S2";
                 registroBitacora(bitacora);
-                res.status(200).json({message : "OK" , Status : 200, response : deletedRecord} );
+                res.status(200).json({message : "OK" , Status : 200, response : deletedRecord , messageFront: "Se eliminaron "+ numRecords+ " registros correctamente " });
+            }else{
+                res.status(500).json({message:"Datos incompletos", code:'500'});
+            }
+        }
+    }catch (e) {
+        console.log(e);
+    }
+
+});
+
+
+app.delete('/deleteRecordS3S',async (req,res)=>{
+    try {
+        var code = validateToken(req);
+        var bitacora=[];
+        if(code.code == 401){
+            res.status(401).json({code: '401', message: code.message});
+        }else if (code.code == 200 ){
+            if(req.body.request._id){
+                let sancionados =  S3S.model('Ssancionados', ssancionadosSchema, 'ssancionados');
+                let deletedRecord;
+                let numRecords=0;
+                if(Array.isArray(req.body.request._id)){
+                    numRecords= req.body.request._id.length;
+                    deletedRecord =  await sancionados
+                        .deleteMany({_id: {
+                                $in:req.body.request._id
+                            }})
+                        .catch(err => res.status(400).json({message : err.message , code: '400'})).then();
+                }else{
+                    numRecords=1;
+                    deletedRecord =  await sancionados
+                        .findByIdAndDelete( req.body.request._id)
+                        .catch(err => res.status(400).json({message : err.message , code: '400'})).then();
+                }
+
+
+                bitacora["tipoOperacion"]="DELETE";
+                bitacora["fechaOperacion"]= moment().format();
+                bitacora["usuario"]=req.body.request.usuario;
+                bitacora["numeroRegistros"]=numRecords;
+                bitacora["sistema"]="S3S";
+                registroBitacora(bitacora);
+                res.status(200).json({message : "OK" , Status : 200, response : deletedRecord , messageFront: "Se eliminaron "+ numRecords+ " registros correctamente " });
             }else{
                 res.status(500).json({message:"Datos incompletos", code:'500'});
             }
@@ -613,7 +770,7 @@ app.post('/updateS2Schema',async (req,res)=>{
     try {
         var code = validateToken(req);
         if(code.code == 401){
-            res.status(401).json({code: '401', message: code.message});
+            res.status(401).json({code: '401', validateSchmessage: code.message});
         }else if (code.code == 200 ){
             let docSend={};
             let values = req.body;
@@ -704,6 +861,7 @@ app.post('/updateS2Schema',async (req,res)=>{
                     docSend["_id"]= values._id;
                     let Spic = S2.model('Spic',spicSchema, 'spic');
                     let esquema = new Spic(docSend);
+                    console.log("IDDD"+ esquema);
                     let response;
                     if(req.body._id ){
                         await Spic.findByIdAndDelete(values._id);
