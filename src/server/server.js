@@ -300,9 +300,9 @@ app.post('/validateSchemaS3S',async (req,res)=>{
             }else{
                 //se insertan
                 try {
-                    let S3SModel = S3S.model('Ssancionados', ssancionadosSchema, 'ssancionados');
+                    let sancionados = S3S.model('Ssancionados', ssancionadosSchema, 'ssancionados');
                     let response;
-                    response = await Spic.insertMany(arrayDocuments);
+                    response = await sancionados.insertMany(arrayDocuments);
                     let detailObject= {};
                     detailObject["numeroRegistros"]= arrayDocuments.length;
                     res.status(200).json({message : "Se realizarón las inserciones correctamente", Status : 200 , response: response, detail: detailObject});
