@@ -477,6 +477,7 @@ app.post('/create/user',async (req,res)=>{
 
                  delete newBody.constrasena;
                  newBody["constrasena"]=password;
+                 newBody["contrasenaNueva"]=true;
 
                 const client = new SMTPClient({
                     user: 'soporteportalpdn@gmail.com',
@@ -1196,11 +1197,33 @@ app.post('/resetpassword',async (req,res)=>{
                 res.status(200).json({message : "Hay errores al enviar tu nueva contraseña.Ponte en contacto con el administrador." , Status : 500});
             }
         });
+        let fechaActual = moment();
 
-        let respuesta= await User.updateOne({correoElectronico: correo },{constrasena: password }).exec();
+        const respuesta= await User.updateOne({correoElectronico: correo },{constrasena: password ,contrasenaNueva:true,vigenciaContrasena : fechaActual.add(3 , 'months').format().toString()});
         res.status(200).json({message : "Se ha enviado tu nueva contraseña al correo electrónico proporcionado." , Status : 200});
 
         }catch (e) {
+        console.log(e);
+    }
+});
+
+app.post('/changepassword',async (req,res)=>{
+    try {
+        let constrasena= req.body.constrasena;
+        let passwordConfirmation= req.body.passwordConfirmation;
+        let id= req.body.user;
+
+        if(constrasena!=passwordConfirmation){
+            res.status(200).json({message : "Las contraseñas no coinciden." , Status : 500});
+            return false;
+        }
+        let fechaActual = moment();
+
+
+        const result = await User.update({_id:id},{constrasena: constrasena,contrasenaNueva:false,  vigenciaContrasena : fechaActual.add(3 , 'months').format().toString()}).then();
+        res.status(200).json({message : "Se ha actualizado tu contraseña." , Status : 200});
+
+    }catch (e) {
         console.log(e);
     }
 });
