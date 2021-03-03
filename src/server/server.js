@@ -514,7 +514,8 @@ app.post('/create/user',async (req,res)=>{
                   proveedorDatos : newBody.proveedorDatos,
                   estatus : newBody.estatus,
                   fechaAlta:newBody.fechaAlta,
-                  vigenciaContrasena: newBody.vigenciaContrasena
+                  vigenciaContrasena: newBody.vigenciaContrasena,
+                  rol: "2"
               });
                  if(newBody.passwordConfirmation){
                      delete newBody.passwordConfirmation;
@@ -523,6 +524,7 @@ app.post('/create/user',async (req,res)=>{
                  delete newBody.constrasena;
                  newBody["constrasena"]=password;
                  newBody["contrasenaNueva"]=true;
+                 newBody["rol"]=2;
 
                 const client = new SMTPClient({
                     user: 'soporteportalpdn@gmail.com',
@@ -622,7 +624,7 @@ app.post('/getUsers',async (req,res)=>{
             let pageSize = req.body.pageSize === undefined ? 10 : req.body.pageSize;
             let query = req.body.query === undefined ? {} : req.body.query;
 
-            const paginationResult = await User.paginate(query, {page :page , limit: pageSize, sort: sortObj}).then();
+            const paginationResult = await User.paginate(query, {page :page , limit: pageSize, sort: sortObj, rol:"2"}).then();
             let objpagination ={hasNextPage : paginationResult.hasNextPage, page:paginationResult.page, pageSize : paginationResult.limit, totalRows: paginationResult.totalDocs }
             let objresults = paginationResult.docs;
 
@@ -645,7 +647,7 @@ app.post('/getUsersFull',async (req,res)=>{
         if(code.code == 401){
             res.status(401).json({code: '401', message: code.message});
         }else if (code.code == 200 ){
-            const result = await User.find({fechaBaja: null}).then();
+            const result = await User.find({fechaBaja: null, rol:"2"}).then();
             let objResponse= {};
             objResponse["results"]= result;
             res.status(200).json(objResponse);
@@ -1081,7 +1083,7 @@ app.post('/getUsersAll',async (req,res)=>{
         if(code.code == 401){
             res.status(401).json({code: '401', message: code.message});
         }else if (code.code == 200 ) {
-            const result = await User.find();
+            const result = await User.find({rol:"2"});
             let objResponse = {};
 
             try {
@@ -1313,9 +1315,39 @@ app.post('/changepassword',async (req,res)=>{
 
 
         const result = await User.update({_id:id},{constrasena: constrasena,contrasenaNueva:false,  vigenciaContrasena : fechaActual.add(3 , 'months').format().toString()}).then();
-        res.status(200).json({message : "Se ha actualizado tu contraseña." , Status : 200});
+        res.status(200).json({message : "¡Se ha actualizado tu contraseña!.Favor de cerrar la sesión e iniciar nuevamente." , Status : 200});
 
     }catch (e) {
         console.log(e);
     }
+});
+
+app.post('/validationpassword',async (req,res)=>{
+    var code = validateToken(req);
+    if(code.code == 401){
+        res.status(401).json({code: '401', message: code.message});
+    }else if (code.code == 200 ) {
+        try {
+            let usuario= req.body.username;
+
+            if(usuario==""){
+                res.status(200).json({message : "Usuario requerido." , Status : 500});
+                return false;
+            }
+
+            const result=await User.find({usuario:usuario}).exec();
+
+            if(result[0].contrasenaNueva===true){
+                res.status(200).json({message : "Necesitas cambiar tu contraseña" , Status : 500, contrasenaNueva:true, rol:result[0].rol});
+            }else{
+                res.status(200).json({message : "Tu contraseña está al día." , Status : 200, contrasenaNueva:false, rol:result[0].rol});
+            }
+
+
+        }catch (e) {
+            console.log(e);
+        }
+
+    }
+
 });
