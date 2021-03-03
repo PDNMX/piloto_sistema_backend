@@ -90,6 +90,51 @@ var validateToken = function(req){
     }
 }
 
+
+const esquemaS3 =Yup.object().shape({
+    expediente: Yup.string().matches(new RegExp('^[A-zÀ-ú-0-9 ]{1,25}$'),'No se permiten cadenas vacías, máximo 25 caracteres').trim(),
+    idnombre:Yup.string().matches(new RegExp('^[A-zÀ-ú-0-9_\.\' ]{1,50}$'),'No se permiten cadenas vacías, máximo 50 caracteres').required("El campo Nombres de la sección Institución Dependencia es requerido").trim(),
+    idsiglas: Yup.string().matches(new RegExp('^[A-zÀ-ú-0-9_\.\' ]{1,25}$'),'No se permiten cadenas vacías, máximo 25 caracteres ').trim(),
+    idclave: Yup.string().matches(new RegExp('^[A-zÀ-ú-0-9_\.\' ]{1,25}$'),'No se permiten cadenas vacías, máximo 25 caracteres').trim(),
+    SPSnombres:Yup.string().matches(new RegExp("^['A-zÀ-ú-\. ]{1,25}$"),'No se permiten números, ni cadenas vacías máximo 25 caracteres ' ).required("El campo Nombres de Servidor público es requerido").trim(),
+    SPSprimerApellido: Yup.string().matches(new RegExp("^['A-zÀ-ú-\. ]{1,25}$"),'No se permiten números, ni cadenas vacías máximo 25 caracteres').required("El campo Primer apellido de Servidor público es requerido").trim(),
+    SPSsegundoApellido: Yup.string().matches(new RegExp("^['A-zÀ-ú-\. ]{1,25}$"),'No se permiten números, ni cadenas vacías máximo 25 caracteres').trim(),
+    SPSgenero : Yup.object(),
+    SPSpuesto:Yup.string().matches(new RegExp("^['A-zÀ-ú-\. ]{1,25}$"),'No se permiten números, ni cadenas vacías máximo 25 caracteres').required("El campo Puesto de Servidor público es requerido").trim(),
+    SPSnivel:Yup.string().matches(new RegExp('^[A-zÀ-ú-0-9_\.\' ]{1,25}$'),'No se cadenas vacías, máximo 25 caracteres').trim(),
+    autoridadSancionadora:Yup.string().matches(new RegExp("^['A-zÀ-ú-\. ]{1,25}$"),'No se permiten números, ni cadenas vacías máximo 25 caracteres').trim(),
+    tipoFalta: Yup.object(),
+    tpfdescripcion: Yup.string().matches(new RegExp('^[A-zÀ-ú-0-9 ]{1,50}$'),'No se permiten cadenas vacías, máximo 50 caracteres').trim(),
+    tipoSancion: Yup.array().min(1).required("Se requiere seleccionar mínimo una opción del campo Tipo sanción"),
+    tsdescripcion:Yup.string().matches(new RegExp('^[A-zÀ-ú-0-9 ]{1,50}$'),'No se permiten cadenas vacías, máximo 50 caracteres').trim(),
+    causaMotivoHechos:  Yup.string().matches(new RegExp('^[A-zÀ-ú-0-9 ]{1,500}$'),'No se permiten cadenas vacías, máximo 500 caracteres').required("El campo Causa o motivo de la sanción es requerido").trim(),
+    resolucionURL: Yup.string()
+        .matches(/((https?):\/\/)?(www.)?[a-z0-9]+(\.[a-z]{2,}){1,3}(#?\/?[a-zA-Z0-9#]+)*\/?(\?[a-zA-Z0-9-_]+=[a-zA-Z0-9-%]+&?)?$/,
+            'Introduce una direccion de internet valida'
+        ),
+    resolucionFecha:  Yup.string().required("El campo Fecha de resolución es requerido"),
+    multaMonto: Yup.string().matches(new RegExp("^([0-9]*[.])?[0-9]+$"),'Solo se permiten números enteros o decimales').required("El campo Monto es requerido"),
+    multaMoneda: Yup.object().required("El campo Moneda es requerido"),
+    inhabilitacionPlazo:Yup.string().matches(new RegExp('^[A-zÀ-ú-0-9 ]*$'),'No se permiten cadenas vacías').trim(),
+    inhabilitacionFechaInicial:  Yup.string().required("El campo Fecha inicial de la sección  es requerido"),
+    inhabilitacionFechaFinal:  Yup.string().required("El campo Fecha final de la sección  es requerido"),
+    observaciones: Yup.string().matches(new RegExp('^[A-zÀ-ú-0-9 ]{1,500}$'),'No se permiten cadenas vacías, máximo 500 caracteres').trim(),
+    documents: Yup.array().of(
+        Yup.object().shape({
+            docId: Yup.string(),
+            titulo: Yup.string().required('El campo Título de la sección Documentos es requerido ').max(50, 'Máximo 50 caracteres'),
+            descripcion: Yup.string().required('El campo Descripción de la sección Documentos es requerido ').max(200, 'Máximo 200 caracteres'),
+            url: Yup.string()
+                .matches(/((https?):\/\/)?(www.)?[a-z0-9]+(\.[a-z]{2,}){1,3}(#?\/?[a-zA-Z0-9#]+)*\/?(\?[a-zA-Z0-9-_]+=[a-zA-Z0-9-%]+&?)?$/,
+                    'Introduce una direccion de internet valida'
+                )
+                .required('El campo URL de la sección Documentos es requerido'),
+            fecha: Yup.string().required("El campo Fecha de la sección Documentos es requerido"),
+            tipoDoc: Yup.object()
+        })
+    )
+});
+
 const esquemaS2=  Yup.object().shape({
     ejercicioFiscal: Yup.string().matches(new RegExp('^[0-9]{4}$'),'Debe tener 4 dígitos'),
     ramo: Yup.string(),
@@ -625,7 +670,7 @@ app.post('/insertS2Schema',async (req,res)=>{
             let validacion = new swaggerValidator.Handler();
             let newdocument = req.body;
             let respuesta = await validateSchema([newdocument],schemaS2,validacion);
-            if(respuesta.valid) {
+            if(respuesta.valid){
                 try {
                     let Spic = S2.model('Spic',spicSchema, 'spic');
                     delete req.body.id;
@@ -648,6 +693,52 @@ app.post('/insertS2Schema',async (req,res)=>{
             }else{
 
                 res.status(400).json({message : "Error in validation" , Status : 400, response : respuesta});
+            }
+        }
+    }catch (e) {
+        console.log(e);
+    }
+});
+
+
+app.post('/insertS3SSchema',async (req,res)=>{
+    try {
+        var code = validateToken(req);
+        var usuario=req.body.usuario;
+        delete req.body.usuario;
+        if(code.code == 401){
+            res.status(401).json({code: '401', message: code.message});
+        }else if (code.code == 200 ) {
+            let docSend = {};
+            let values = req.body;
+            console.log(req.body);
+            //validaciones
+            console.log("estamos en las validaciones ");
+
+            values['fechaCaptura'] = moment().format();
+            values["id"] = "FAKEID";
+
+
+           console.log(JSON.stringify(values));
+
+            let fileContents = fs.readFileSync(path.resolve(__dirname, '../src/resource/openapis3s.yaml'), 'utf8');
+            let data = yaml.safeLoad(fileContents);
+            let schemaResults = data.components.schemas.ssancionados.properties.results;
+            schemaResults.items.properties.tipoFalta = data.components.schemas.tipoFalta;
+            schemaResults.items.properties.tipoSancion = data.components.schemas.tipoSancion;
+
+            let schemaS3S = schemaResults;
+
+            let validacion = new swaggerValidator.Handler();
+
+
+            let respuesta = await validateSchema([values], schemaS3S, validacion);
+
+            if (respuesta.valid) {
+                console.log("FUE VALIDO");
+            }else{
+                console.log(respuesta);
+                res.status(400).json({message : "Error in validation openApi" , Status : 400, response : respuesta});
             }
         }
     }catch (e) {
@@ -679,7 +770,7 @@ app.post('/listSchemaS3S',async (req,res)=> {
             res.status(200).json(objResponse);
         }
     }catch (e) {
-console.log(e);
+        console.log(e);
     }
 });
 
@@ -1018,7 +1109,8 @@ app.post('/getCatalogs',async (req,res)=>{
             const result = await Catalog.find({docType: docType}).then();
             let objResponse= {};
             let strippedRows;
-            if(docType === "genero" || docType === "ramo"|| docType === "tipoArea" || docType=== "nivelResponsabilidad" || docType === "tipoProcedimiento"){
+            if(docType === "genero" || docType === "ramo"|| docType === "tipoArea" || docType=== "nivelResponsabilidad" || docType === "tipoProcedimiento"
+            ||docType === "tipoFalta" || docType === "tipoSancion" || docType === "moneda" || docType === "tipoDocumento" ){
                 try {
                      strippedRows = _.map(result, function (row) {
                         let rowExtend = _.extend({label: row.valor, value: JSON.stringify({clave:row.clave ,valor : row.valor})}, row.toObject());
