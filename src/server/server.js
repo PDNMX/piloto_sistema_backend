@@ -710,17 +710,11 @@ app.post('/insertS3SSchema',async (req,res)=>{
         if(code.code == 401){
             res.status(401).json({code: '401', message: code.message});
         }else if (code.code == 200 ) {
-            let docSend = {};
+
             let values = req.body;
-            console.log(req.body);
-            //validaciones
-            console.log("estamos en las validaciones ");
 
             values['fechaCaptura'] = moment().format();
             values["id"] = "FAKEID";
-
-
-           console.log(JSON.stringify(values));
 
             let fileContents = fs.readFileSync(path.resolve(__dirname, '../src/resource/openapis3s.yaml'), 'utf8');
             let data = yaml.safeLoad(fileContents);
@@ -729,14 +723,31 @@ app.post('/insertS3SSchema',async (req,res)=>{
             schemaResults.items.properties.tipoSancion = data.components.schemas.tipoSancion;
 
             let schemaS3S = schemaResults;
-
             let validacion = new swaggerValidator.Handler();
-
-
             let respuesta = await validateSchema([values], schemaS3S, validacion);
+                //se insertan
 
             if (respuesta.valid) {
-                console.log("FUE VALIDO");
+                try {
+                    let sancionados = S3S.model('Ssancionados', ssancionadosSchema, 'ssancionados');
+                    let response;
+                    delete values.id;
+                    let esquema= new sancionados(values);
+                    const result = await esquema.save();
+                    let objResponse= {};
+                    objResponse["results"]= result;
+                    var bitacora=[];
+                    bitacora["tipoOperacion"]="CREATE";
+                    bitacora["fechaOperacion"]= moment().format();
+                    bitacora["usuario"]=usuario;
+                    bitacora["numeroRegistros"]=1;
+                    bitacora["sistema"]="S3S";
+                    registroBitacora(bitacora);
+                    res.status(200).json({message : "Se realizarón las inserciones correctamente", Status : 200 , response: response, detail: objResponse});
+                }catch (e) {
+                    console.log(e);
+                }
+
             }else{
                 console.log(respuesta);
                 res.status(400).json({message : "Error in validation openApi" , Status : 400, response : respuesta});
