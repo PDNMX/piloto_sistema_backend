@@ -672,6 +672,8 @@ app.post('/insertS2Schema',async (req,res)=>{
             let schemaS2 =  data.components.schemas.respSpic;
             let validacion = new swaggerValidator.Handler();
             let newdocument = req.body;
+            newdocument["id"]= "FAKEID";
+            newdocument["fechaCaptura"]= moment().format();
             let respuesta = await validateSchema([newdocument],schemaS2,validacion);
             if(respuesta.valid){
                 try {
@@ -694,7 +696,6 @@ app.post('/insertS2Schema',async (req,res)=>{
                     console.log(e);
                 }
             }else{
-
                 res.status(400).json({message : "Error in validation" , Status : 400, response : respuesta});
             }
         }
@@ -904,6 +905,67 @@ app.delete('/deleteRecordS3S',async (req,res)=>{
 
 });
 
+app.post('/updateS3SSchema',async (req,res)=>{
+    try {
+        var code = validateToken(req);
+        var usuario=req.body.usuario;
+        delete req.body.usuario;
+        if(code.code == 401){
+            res.status(401).json({code: '401', message: code.message});
+        }else if (code.code == 200 ) {
+            let id= req.body._id;
+            delete req.body._id;
+            let values = req.body;
+            values['fechaCaptura'] = moment().format();
+            values["id"] = "FAKEID";
+
+            let fileContents = fs.readFileSync(path.resolve(__dirname, '../src/resource/openapis3s.yaml'), 'utf8');
+            let data = yaml.safeLoad(fileContents);
+            let schemaResults = data.components.schemas.ssancionados.properties.results;
+            schemaResults.items.properties.tipoFalta = data.components.schemas.tipoFalta;
+            schemaResults.items.properties.tipoSancion = data.components.schemas.tipoSancion;
+
+            let schemaS3S = schemaResults;
+            let validacion = new swaggerValidator.Handler();
+            let respuesta = await validateSchema([values], schemaS3S, validacion);
+            //se insertan
+
+            if (respuesta.valid) {
+                try {
+                    values["_id"]= id;
+                    let sancionados = S3S.model('Ssancionados', ssancionadosSchema, 'ssancionados');
+                    let esquema= new sancionados(values);
+                    console.log("IDDD"+ esquema);
+                    let response;
+                    if(values._id ){
+                        await sancionados.findByIdAndDelete(values._id);
+                        response = await sancionados.findByIdAndUpdate(values._id ,esquema, {upsert: true, new: true} ).exec();
+                        let objResponse= {};
+                        objResponse["results"]= response;
+                        var bitacora=[];
+                        bitacora["tipoOperacion"]="UPDATE";
+                        bitacora["fechaOperacion"]= moment().format();
+                        bitacora["usuario"]=usuario;
+                        bitacora["numeroRegistros"]=1;
+                        bitacora["sistema"]="S3S";
+                        registroBitacora(bitacora);
+                        res.status(200).json(response);
+                    }else{
+                        res.status(500).json({message : "Error : Datos incompletos" , Status : 500});
+                    }
+                }catch (e) {
+                    console.log(e);
+                }
+
+            }else{
+                console.log(respuesta);
+                res.status(400).json({message : "Error in validation openApi" , Status : 400, response : respuesta});
+            }
+        }
+    }catch (e) {
+        console.log(e);
+    }
+});
 
 app.post('/updateS2Schema',async (req,res)=>{
     try {
@@ -927,7 +989,8 @@ app.post('/updateS2Schema',async (req,res)=>{
             }
 
             docSend["id"]= values._id;
-            if(values.fechaCaptura){docSend["fechaCaptura"]= values.fechaCaptura;}
+            docSend['fechaCaptura'] = moment().format();
+
             if(values.ejercicioFiscal){docSend["ejercicioFiscal"]= values.ejercicioFiscal;}
             if(values.ramo){
                 let ramoObj = JSON.parse(values.ramo);
