@@ -6,6 +6,7 @@ import * as Yup from 'yup';
 import User from './schemas/model.user';
 import {spicSchema} from './schemas/model.s2';
 import {ssancionadosSchema} from './schemas/model.s3s';
+import {psancionadosSchema} from './schemas/model.s3p';
 import Provider from './schemas/model.proovedor';
 import Catalog from './schemas/model.catalog';
 import Bitacora from './schemas/model.bitacora';
@@ -34,6 +35,7 @@ mongoose.set('useFindAndModify', false);
 
 let S2 = mongoose.connection.useDb("S2");
 let S3S = mongoose.connection.useDb("S3_Servidores");
+let S3P =mongoose.connection.useDb("S3_Particulares");
 //let port = process.env.PORT || 7777;
 let app = express();
 app.use(
@@ -818,6 +820,34 @@ app.post('/listSchemaS2',async (req,res)=> {
     }
 });
 
+app.post('/listSchemaS3P',async (req,res)=> {
+    try {
+        var code = validateToken(req);
+        if(code.code == 401){
+            res.status(401).json({code: '401', message: code.message});
+        }else if (code.code == 200 ){
+            let sancionados =  S3P.model('Psancionados', psancionadosSchema, 'psancionados');
+            let sortObj = req.body.sort  === undefined ? {} : req.body.sort;
+            let page = req.body.page === undefined ? 1 : req.body.page ;  //numero de pagina a mostrar
+            let pageSize = req.body.pageSize === undefined ? 10 : req.body.pageSize;
+            let query = req.body.query === undefined ? {} : req.body.query;
+
+            console.log({page :page , limit: pageSize, sort: sortObj, query: query});
+            const paginationResult = await sancionados.paginate(query, {page :page , limit: pageSize, sort: sortObj}).then();
+            let objpagination ={hasNextPage : paginationResult.hasNextPage, page:paginationResult.page, pageSize : paginationResult.limit, totalRows: paginationResult.totalDocs }
+            let objresults = paginationResult.docs;
+
+            let objResponse= {};
+            objResponse["pagination"] = objpagination;
+            objResponse["results"]= objresults;
+
+            res.status(200).json(objResponse);
+        }
+    }catch (e) {
+        console.log(e);
+    }
+});
+
 
 app.delete('/deleteRecordS2',async (req,res)=>{
     try {
@@ -905,15 +935,58 @@ app.delete('/deleteRecordS3S',async (req,res)=>{
 
 });
 
+app.delete('/deleteRecordS3P',async (req,res)=>{
+    try {
+        var code = validateToken(req);
+        var bitacora=[];
+        if(code.code == 401){
+            res.status(401).json({code: '401', message: code.message});
+        }else if (code.code == 200 ){
+            if(req.body.request._id){
+                let sancionados =  S3P.model('Psancionados', psancionadosSchema, 'psancionados');
+                let deletedRecord;
+                let numRecords=0;
+                if(Array.isArray(req.body.request._id)){
+                    numRecords= req.body.request._id.length;
+                    deletedRecord =  await sancionados
+                        .deleteMany({_id: {
+                                $in:req.body.request._id
+                            }})
+                        .catch(err => res.status(400).json({message : err.message , code: '400'})).then();
+                }else{
+                    numRecords=1;
+                    deletedRecord =  await sancionados
+                        .findByIdAndDelete( req.body.request._id)
+                        .catch(err => res.status(400).json({message : err.message , code: '400'})).then();
+                }
+
+
+                bitacora["tipoOperacion"]="DELETE";
+                bitacora["fechaOperacion"]= moment().format();
+                bitacora["usuario"]=req.body.request.usuario;
+                bitacora["numeroRegistros"]=numRecords;
+                bitacora["sistema"]="S3P";
+                registroBitacora(bitacora);
+                res.status(200).json({message : "OK" , Status : 200, response : deletedRecord , messageFront: "Se eliminaron "+ numRecords+ " registros correctamente " });
+            }else{
+                res.status(500).json({message:"Datos incompletos", code:'500'});
+            }
+        }
+    }catch (e) {
+        console.log(e);
+    }
+
+});
+
 app.post('/updateS3SSchema',async (req,res)=>{
     try {
         var code = validateToken(req);
-        var usuario=req.body.usuario;
+        var usuario = req.body.usuario;
         delete req.body.usuario;
-        if(code.code == 401){
+        if (code.code == 401) {
             res.status(401).json({code: '401', message: code.message});
-        }else if (code.code == 200 ) {
-            let id= req.body._id;
+        } else if (code.code == 200) {
+            let id = req.body._id;
             delete req.body._id;
             let values = req.body;
             values['fechaCaptura'] = moment().format();
@@ -932,40 +1005,44 @@ app.post('/updateS3SSchema',async (req,res)=>{
 
             if (respuesta.valid) {
                 try {
-                    values["_id"]= id;
+                    values["_id"] = id;
                     let sancionados = S3S.model('Ssancionados', ssancionadosSchema, 'ssancionados');
-                    let esquema= new sancionados(values);
-                    console.log("IDDD"+ esquema);
+                    let esquema = new sancionados(values);
+                    console.log("IDDD" + esquema);
                     let response;
-                    if(values._id ){
+                    if (values._id) {
                         await sancionados.findByIdAndDelete(values._id);
-                        response = await sancionados.findByIdAndUpdate(values._id ,esquema, {upsert: true, new: true} ).exec();
-                        let objResponse= {};
-                        objResponse["results"]= response;
-                        var bitacora=[];
-                        bitacora["tipoOperacion"]="UPDATE";
-                        bitacora["fechaOperacion"]= moment().format();
-                        bitacora["usuario"]=usuario;
-                        bitacora["numeroRegistros"]=1;
-                        bitacora["sistema"]="S3S";
+                        response = await sancionados.findByIdAndUpdate(values._id, esquema, {
+                            upsert: true,
+                            new: true
+                        }).exec();
+                        let objResponse = {};
+                        objResponse["results"] = response;
+                        var bitacora = [];
+                        bitacora["tipoOperacion"] = "UPDATE";
+                        bitacora["fechaOperacion"] = moment().format();
+                        bitacora["usuario"] = usuario;
+                        bitacora["numeroRegistros"] = 1;
+                        bitacora["sistema"] = "S3S";
                         registroBitacora(bitacora);
                         res.status(200).json(response);
-                    }else{
-                        res.status(500).json({message : "Error : Datos incompletos" , Status : 500});
+                    } else {
+                        res.status(500).json({message: "Error : Datos incompletos", Status: 500});
                     }
-                }catch (e) {
+                } catch (e) {
                     console.log(e);
                 }
 
-            }else{
+            } else {
                 console.log(respuesta);
-                res.status(400).json({message : "Error in validation openApi" , Status : 400, response : respuesta});
+                res.status(400).json({message: "Error in validation openApi", Status: 400, response: respuesta});
             }
+            }
+        }catch (e) {
+            console.log(e);
         }
-    }catch (e) {
-        console.log(e);
-    }
 });
+
 
 app.post('/updateS2Schema',async (req,res)=>{
     try {
