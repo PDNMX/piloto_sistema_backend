@@ -463,6 +463,8 @@ app.delete('/deleteProvider',async (req,res)=>{
                 let fechabaja = moment().format();
                 let response = await Provider.findByIdAndUpdate( req.body.request._id , {$set: {fechaBaja : fechabaja}} ).exec();
                 res.status(200).json({message : "OK" , Status : 200, response : response});
+            }else{
+                res.status(500).json({message : "Error : Datos incompletos" , Status : 500});
             }
         }
     }catch (e) {
@@ -483,9 +485,10 @@ app.post('/create/provider',async(req, res)=>{
                 await schemaProvider.validate({
                     dependencia: req.body.dependencia,
                     sistemas : req.body.sistemas,
-                    estatus : req.body.estatus,
+                    estatus : true,
                     fechaAlta: req.body.fechaAlta
                 });
+                req.body["estatus"]=true;
 
                 const nuevoProovedor = new Provider(req.body);
                 let responce;
