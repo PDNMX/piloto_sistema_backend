@@ -12,7 +12,7 @@ let psancionadosSchema = new Schema({
                 valor: String,
                 clave: String
             },
-            muncipio:{
+            municipio:{
                 valor: String,
                 clave: String
             },
@@ -44,7 +44,19 @@ let psancionadosSchema = new Schema({
         objetoSocial: String,
         rfc: String,
         tipoPersona: String,
-        telefono: String
+        telefono: String,
+        directorGeneral:{
+            nombres: String,
+            primerApellido: String,
+            segundoApellido: String,
+            curp: String
+        },
+        apoderadoLegal:{
+            nombres: String,
+            primerApellido: String,
+            segundoApellido: String,
+            curp: String
+        },
     },
     multa:{
         monto: Number,
@@ -59,18 +71,6 @@ let psancionadosSchema = new Schema({
         nombre: String,
         clave: String,
         siglas: String
-    },
-    directorGeneral:{
-        nombres: String,
-        primerApellido: String,
-        segundoApellido: String,
-        curp: String
-    },
-    apoderadoLegal:{
-        nombres: String,
-        primerApellido: String,
-        segundoApellido: String,
-        curp: String
     },
     objetoContrato:String,
     autoridadSancionadora: String,

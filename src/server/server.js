@@ -363,6 +363,73 @@ app.post('/validateSchemaS3S',async (req,res)=>{
     }
 });
 
+app.post('/validateSchemaS3P',async (req,res)=>{
+    try {
+        var code = validateToken(req);
+        if(code.code == 401){
+            res.status(401).json({code: '401', message: code.message});
+        }else if (code.code == 200){
+            let fileContents = fs.readFileSync(path.resolve(__dirname, '../src/resource/openapis3p.yaml'), 'utf8');
+            let data = yaml.safeLoad(fileContents);
+            let schemaResults = data.components.schemas.resParticularesSancionados.properties.results;
+            schemaResults.items.properties.particularSancionado.properties.domicilioExtranjero.properties.pais =  data.components.schemas.pais;
+            schemaResults.items.properties.tipoSancion = data.components.schemas.tipoSancion;
+
+            let schemaS3P = schemaResults;
+
+            let validacion = new swaggerValidator.Handler();
+            let newdocument = req.body;
+            let respuesta=[];
+            let arrayDocuments=[];
+            let ids= [];
+            let c1=1;
+            if(Array.isArray(newdocument)){
+                for (let doc of newdocument){
+                    doc["id"]= c1.toString();
+                    doc["fechaCaptura"]= moment().format();
+                    c1++;
+                    respuesta.push(await validateSchema([doc],schemaS3P,validacion));
+                    ids.push(doc.id);
+                    arrayDocuments.push(doc);
+                }
+            }else{
+                newdocument["id"]= c1.toString();
+                newdocument["fechaCaptura"]= moment().format();
+                c1++;
+                respuesta.push(await validateSchema([newdocument],schemaS3P,validacion));
+                arrayDocuments.push(newdocument);
+            }
+
+            let wasInvalid;
+
+            for(let val of respuesta){
+                if(!val.valid){
+                    wasInvalid= true;
+                }
+            }
+
+            if(wasInvalid){
+                res.status(200).json({message : "Error : La validación no fue exitosa" , Status : 500, response : respuesta});
+            }else{
+                //se insertan
+                console.log("paso la validacion");
+                try {
+                    let psancionados = S3P.model('Psancionados', psancionadosSchema, 'psancionados');
+                    let response;
+                    response = await psancionados.insertMany(arrayDocuments);
+                    let detailObject= {};
+                    detailObject["numeroRegistros"]= arrayDocuments.length;
+                    res.status(200).json({message : "Se realizarón las inserciones correctamente", Status : 200 , response: response, detail: detailObject});
+                }catch (e) {
+                    console.log(e);
+                }
+            }
+        }
+    }catch (e) {
+        console.log(e);
+    }
+});
+
 app.delete('/deleteUser',async (req,res)=>{
     try {
         var code = validateToken(req);
