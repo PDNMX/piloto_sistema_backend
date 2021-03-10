@@ -1334,7 +1334,7 @@ app.post('/getCatalogs',async (req,res)=>{
             let objResponse= {};
             let strippedRows;
             if(docType === "genero" || docType === "ramo"|| docType === "tipoArea" || docType=== "nivelResponsabilidad" || docType === "tipoProcedimiento"
-            ||docType === "tipoFalta" || docType === "tipoSancion" || docType === "moneda" || docType === "tipoDocumento" ){
+            ||docType === "tipoFalta" || docType === "tipoSancion" || docType === "moneda" || docType === "tipoDocumento" || docType==="tipoPersona"){
                 try {
                      strippedRows = _.map(result, function (row) {
                         let rowExtend = _.extend({label: row.valor, value: JSON.stringify({clave:row.clave ,valor : row.valor})}, row.toObject());

@@ -65,6 +65,11 @@ let psancionadosSchema = new Schema({
             valor:String
         }
     },
+    inhabilitacion:{
+        plazo: String,
+        fechaInicial:String,
+        fechaFinal:String
+    },
     fechaCaptura: String,
     expediente: String,
     institucionDependencia: {
