@@ -503,7 +503,6 @@ app.post('/create/provider',async(req, res)=>{
                 errorMessage["mensaje"] = e.message;
                 res.status(400).json(errorMessage);
             }
-
         }
     }catch (e){
         console.log(e);
@@ -817,6 +816,64 @@ app.post('/insertS3SSchema',async (req,res)=>{
                     bitacora["usuario"]=usuario;
                     bitacora["numeroRegistros"]=1;
                     bitacora["sistema"]="S3S";
+                    registroBitacora(bitacora);
+                    res.status(200).json({message : "Se realizarón las inserciones correctamente", Status : 200 , response: response, detail: objResponse});
+                }catch (e) {
+                    console.log(e);
+                }
+
+            }else{
+                console.log(respuesta);
+                res.status(400).json({message : "Error in validation openApi" , Status : 400, response : respuesta});
+            }
+        }
+    }catch (e) {
+        console.log(e);
+    }
+});
+
+/////////////////////////////////////////////////////////SHEMA S2///////////////////////////////////////////
+
+app.post('/insertS3PSchema',async (req,res)=>{
+    try {
+        var code = validateToken(req);
+        var usuario=req.body.usuario;
+        delete req.body.usuario;
+        if(code.code == 401){
+            res.status(401).json({code: '401', message: code.message});
+        }else if (code.code == 200 ){
+            let values = req.body;
+
+            values['fechaCaptura'] = moment().format();
+            values["id"] = "FAKEID";
+
+            let fileContents = fs.readFileSync(path.resolve(__dirname, '../src/resource/openapis3p.yaml'), 'utf8');
+            let data = yaml.safeLoad(fileContents);
+            let schemaResults = data.components.schemas.resParticularesSancionados.properties.results;
+            schemaResults.items.properties.particularSancionado.properties.domicilioExtranjero.properties.pais =  data.components.schemas.pais;
+            schemaResults.items.properties.tipoSancion = data.components.schemas.tipoSancion;
+            let schemaS3P = schemaResults;
+
+            let validacion = new swaggerValidator.Handler();
+            let respuesta = await validateSchema([values], schemaS3P, validacion);
+            //se insertan
+
+            if (respuesta.valid) {
+                try {
+                    let psancionados = S3P.model('Psancionados', psancionadosSchema, 'psancionados');
+                    let response;
+                    delete values.id;
+                    console.log(values);
+                    let esquema= new psancionados(values);
+                    const result = await esquema.save();
+                    let objResponse= {};
+                    objResponse["results"]= result;
+                    var bitacora=[];
+                    bitacora["tipoOperacion"]="CREATE";
+                    bitacora["fechaOperacion"]= moment().format();
+                    bitacora["usuario"]=usuario;
+                    bitacora["numeroRegistros"]=1;
+                    bitacora["sistema"]="S3P";
                     registroBitacora(bitacora);
                     res.status(200).json({message : "Se realizarón las inserciones correctamente", Status : 200 , response: response, detail: objResponse});
                 }catch (e) {
@@ -1334,7 +1391,8 @@ app.post('/getCatalogs',async (req,res)=>{
             let objResponse= {};
             let strippedRows;
             if(docType === "genero" || docType === "ramo"|| docType === "tipoArea" || docType=== "nivelResponsabilidad" || docType === "tipoProcedimiento"
-            ||docType === "tipoFalta" || docType === "tipoSancion" || docType === "moneda" || docType === "tipoDocumento" || docType==="tipoPersona"){
+            ||docType === "tipoFalta" || docType === "tipoSancion" || docType === "moneda" || docType === "tipoDocumento" || docType === "tipoPersona"
+            ||docType === "pais" ||docType === "estado" ||docType === "municipio" ||docType === "vialidad" ){
                 try {
                      strippedRows = _.map(result, function (row) {
                         let rowExtend = _.extend({label: row.valor, value: JSON.stringify({clave:row.clave ,valor : row.valor})}, row.toObject());
