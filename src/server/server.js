@@ -959,7 +959,6 @@ app.post('/listSchemaS3P',async (req,res)=> {
             let pageSize = req.body.pageSize === undefined ? 10 : req.body.pageSize;
             let query = req.body.query === undefined ? {} : req.body.query;
 
-            console.log({page :page , limit: pageSize, sort: sortObj, query: query});
             const paginationResult = await sancionados.paginate(query, {page :page , limit: pageSize, sort: sortObj}).then();
             let objpagination ={hasNextPage : paginationResult.hasNextPage, page:paginationResult.page, pageSize : paginationResult.limit, totalRows: paginationResult.totalDocs }
             let objresults = paginationResult.docs;
@@ -1607,19 +1606,19 @@ app.post('/validationpassword',async (req,res)=>{
         res.status(401).json({code: '401', message: code.message});
     }else if (code.code == 200 ) {
         try {
-            let usuario= req.body.username;
+            let id_usuario=req.body.id_usuario;
 
-            if(usuario==""){
-                res.status(200).json({message : "Usuario requerido." , Status : 500});
+            if(id_usuario==""){
+                res.status(200).json({message : "Id Usuario requerido." , Status : 500});
                 return false;
             }
 
-            const result=await User.find({usuario:usuario}).exec();
+            const result=await User.findById(id_usuario).exec();
 
-            if(result[0].contrasenaNueva===true){
-                res.status(200).json({message : "Necesitas cambiar tu contraseña" , Status : 500, contrasenaNueva:true, rol:result[0].rol});
+            if(result.contrasenaNueva===true){
+                res.status(200).json({message : "Necesitas cambiar tu contraseña" , Status : 500, contrasenaNueva:true, rol:result.rol, sistemas:result.sistemas});
             }else{
-                res.status(200).json({message : "Tu contraseña está al día." , Status : 200, contrasenaNueva:false, rol:result[0].rol});
+                res.status(200).json({message : "Tu contraseña está al día." , Status : 200, contrasenaNueva:false, rol:result.rol, sistemas:result.sistemas});
             }
 
 
