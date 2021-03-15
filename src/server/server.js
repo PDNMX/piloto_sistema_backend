@@ -23,6 +23,7 @@ var jwt = require('jsonwebtoken');
 import regeneratorRuntime from "regenerator-runtime";
 import * as Console from "console";
 import { SMTPClient } from 'emailjs';
+import {forEach} from "underscore";
 
 
 //connection mongo db
@@ -1421,7 +1422,7 @@ app.post('/getCatalogs',async (req,res)=>{
 
 app.post('/getBitacora',async (req,res)=>{
     try {
-       function horaActual(horaAct){
+        function horaActual(horaAct){
             var zona = (new Date()).getTimezoneOffset()*60000 ; //offset in milliseconds
             var hora = (new Date(horaAct-zona)).toISOString().slice(0, -5);
             return hora;
@@ -1507,7 +1508,6 @@ app.post('/getBitacora',async (req,res)=>{
     }catch (e) {
         console.log(e);
     }
-
 });
 
 app.post('/resetpassword',async (req,res)=>{
