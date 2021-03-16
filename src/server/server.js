@@ -23,6 +23,7 @@ var jwt = require('jsonwebtoken');
 import regeneratorRuntime from "regenerator-runtime";
 import * as Console from "console";
 import { SMTPClient } from 'emailjs';
+import {forEach} from "underscore";
 
 
 //connection mongo db
@@ -958,7 +959,6 @@ app.post('/listSchemaS3P',async (req,res)=> {
             let pageSize = req.body.pageSize === undefined ? 10 : req.body.pageSize;
             let query = req.body.query === undefined ? {} : req.body.query;
 
-            //console.log({page :page , limit: pageSize, sort: sortObj, query: query});
             const paginationResult = await sancionados.paginate(query, {page :page , limit: pageSize, sort: sortObj}).then();
             let objpagination ={hasNextPage : paginationResult.hasNextPage, page:paginationResult.page, pageSize : paginationResult.limit, totalRows: paginationResult.totalDocs }
             let objresults = paginationResult.docs;
@@ -1104,73 +1104,6 @@ app.delete('/deleteRecordS3P',async (req,res)=>{
 
 });
 
-app.post('/updateS3PSchema',async (req,res)=>{
-    try {
-
-        var code = validateToken(req);
-        var usuario = req.body.usuario;
-        delete req.body.usuario;
-        if (code.code == 401) {
-            res.status(401).json({code: '401', message: code.message});
-        } else if (code.code == 200) {
-            let id = req.body._id;
-            delete req.body._id;
-            let values = req.body;
-            values['fechaCaptura'] = moment().format();
-            values["id"] = "FAKEID";
-
-            let fileContents = fs.readFileSync(path.resolve(__dirname, '../src/resource/openapis3p.yaml'), 'utf8');
-            let data = yaml.safeLoad(fileContents);
-            let schemaResults = data.components.schemas.resParticularesSancionados.properties.results;
-            schemaResults.items.properties.particularSancionado.properties.domicilioExtranjero.properties.pais =  data.components.schemas.pais;
-            schemaResults.items.properties.tipoSancion = data.components.schemas.tipoSancion;
-            let schemaS3P = schemaResults;
-
-
-            let validacion = new swaggerValidator.Handler();
-            let respuesta = await validateSchema([values], schemaS3P, validacion);
-            //se insertan
-
-            if (respuesta.valid) {
-                try {
-                    values["_id"] = id;
-                    let psancionados = S3P.model('Psancionados', psancionadosSchema, 'psancionados');
-                    let esquema = new psancionados(values);
-                    let response;
-                    if (values._id) {
-                        await psancionados.findByIdAndDelete(values._id);
-                        response = await psancionados.findByIdAndUpdate(values._id, esquema, {
-                            upsert: true,
-                            new: true
-                        }).exec();
-                        let objResponse = {};
-                        objResponse["results"] = response;
-                        var bitacora = [];
-                        bitacora["tipoOperacion"] = "UPDATE";
-                        bitacora["fechaOperacion"] = moment().format();
-                        bitacora["usuario"] = usuario;
-                        bitacora["numeroRegistros"] = 1;
-                        bitacora["sistema"] = "S3P";
-                        registroBitacora(bitacora);
-                        res.status(200).json(response);
-                    } else {
-                        res.status(500).json({message: "Error : Datos incompletos", Status: 500});
-                    }
-                } catch (e) {
-                    console.log(e);
-                }
-
-            } else {
-                console.log(respuesta);
-                res.status(400).json({message: "Error in validation openApi", Status: 400, response: respuesta});
-            }
-        }
-    }catch (e) {
-        console.log(e);
-    }
-});
-
-
 app.post('/updateS3SSchema',async (req,res)=>{
     try {
         var code = validateToken(req);
@@ -1201,7 +1134,7 @@ app.post('/updateS3SSchema',async (req,res)=>{
                     values["_id"] = id;
                     let sancionados = S3S.model('Ssancionados', ssancionadosSchema, 'ssancionados');
                     let esquema = new sancionados(values);
-                    //console.log("IDDD" + esquema);
+                    console.log("IDDD" + esquema);
                     let response;
                     if (values._id) {
                         await sancionados.findByIdAndDelete(values._id);
@@ -1246,6 +1179,7 @@ app.post('/updateS2Schema',async (req,res)=>{
             let docSend={};
             let values = req.body;
             //validaciones
+            console.log("estamos en las validaciones ");
             try {
                 await esquemaS2.validate(values);
             }catch (e) {
@@ -1319,6 +1253,8 @@ app.post('/updateS2Schema',async (req,res)=>{
 
             docSend["superiorInmediato"] = objSuperiorInmediato;
 
+            console.log("ya paso la validacion  "+ JSON.stringify(docSend));
+
             let fileContents = fs.readFileSync( path.resolve(__dirname, '../src/resource/openapis2.yaml'), 'utf8');
             let data = yaml.safeLoad(fileContents);
             let schemaS2 =  data.components.schemas.respSpic;
@@ -1330,6 +1266,7 @@ app.post('/updateS2Schema',async (req,res)=>{
                     docSend["_id"]= values._id;
                     let Spic = S2.model('Spic',spicSchema, 'spic');
                     let esquema = new Spic(docSend);
+                    console.log("IDDD"+ esquema);
                     let response;
                     if(req.body._id ){
                         await Spic.findByIdAndDelete(values._id);
@@ -1370,6 +1307,7 @@ app.post('/getProviders',async (req,res)=>{
             let page = req.body.page === undefined ? 1 : req.body.page ;  //numero de pagina a mostrar
             let pageSize = req.body.pageSize === undefined ? 10 : req.body.pageSize;
             let query = req.body.query === undefined ? {} : req.body.query;
+            console.log({page :page , limit: pageSize, sort: sortObj});
             const paginationResult = await Provider.paginate(query, {page :page , limit: pageSize, sort: sortObj}).then();
             let objpagination ={hasNextPage : paginationResult.hasNextPage, page:paginationResult.page, pageSize : paginationResult.limit, totalRows: paginationResult.totalDocs }
             let objresults = paginationResult.docs;
@@ -1481,83 +1419,9 @@ app.post('/getCatalogs',async (req,res)=>{
     }
 });
 
-
-
-app.post('/getCatalogsMunicipiosPorEstado',async (req,res)=>{
-    try {
-        var code = validateToken(req);
-        let docType= "municipio";
-        let idEstado= req.body.idEstado;
-        let objEstado;
-        try {
-            objEstado= JSON.parse(idEstado);
-        }catch (e) {
-            console.log(e);
-        }
-        if(code.code == 401){
-            res.status(401).json({code: '401', message: code.message});
-        }else if (code.code == 200 ){
-            //console.log({docType: docType, cve_ent : objEstado.clave });
-            const result = await Catalog.find({docType: docType, cve_ent :  objEstado.clave }).then();
-            let objResponse= {};
-            let strippedRows;
-
-                try {
-                    strippedRows = _.map(result, function (row) {
-                        let rowExtend = _.extend({label: row.valor, value: JSON.stringify({clave:row.clave ,valor : row.valor})}, row.toObject());
-                        return rowExtend;
-                    });
-                } catch (e) {
-                    console.log(e);
-                }
-
-            objResponse["results"]= strippedRows;
-            res.status(200).json(objResponse);
-        }
-    }catch (e) {
-        console.log(e);
-    }
-});
-
-
-app.post('/getCatalogsLocalidadesPorEstado',async (req,res)=>{
-    try {
-        var code = validateToken(req);
-        let docType= "localidad";
-        let idMunicipio= req.body.idMunicipio;
-        let objMunicipio;
-        try {
-            objMunicipio= JSON.parse(idMunicipio);
-        }catch (e) {
-            console.log(e);
-        }
-        if(code.code == 401){
-            res.status(401).json({code: '401', message: code.message});
-        }else if (code.code == 200 ){
-            //console.log({docType: docType, cve_ent : objMunicipio.clave });
-            const result = await Catalog.find({docType: docType, cve_mun :  objMunicipio.clave }).then();
-            let objResponse= {};
-            let strippedRows;
-
-            try {
-                strippedRows = _.map(result, function (row) {
-                    let rowExtend = _.extend({label: row.valor, value: JSON.stringify({clave:row.clave ,valor : row.valor})}, row.toObject());
-                    return rowExtend;
-                });
-            } catch (e) {
-                console.log(e);
-            }
-
-            objResponse["results"]= strippedRows;
-            res.status(200).json(objResponse);
-        }
-    }catch (e) {
-        console.log(e);
-    }
-});
 app.post('/getBitacora',async (req,res)=>{
     try {
-       function horaActual(horaAct){
+        function horaActual(horaAct){
             var zona = (new Date()).getTimezoneOffset()*60000 ; //offset in milliseconds
             var hora = (new Date(horaAct-zona)).toISOString().slice(0, -5);
             return hora;
@@ -1742,19 +1606,19 @@ app.post('/validationpassword',async (req,res)=>{
         res.status(401).json({code: '401', message: code.message});
     }else if (code.code == 200 ) {
         try {
-            let usuario= req.body.username;
+            let id_usuario=req.body.id_usuario;
 
-            if(usuario==""){
-                res.status(200).json({message : "Usuario requerido." , Status : 500});
+            if(id_usuario==""){
+                res.status(200).json({message : "Id Usuario requerido." , Status : 500});
                 return false;
             }
 
-            const result=await User.find({usuario:usuario}).exec();
+            const result=await User.findById(id_usuario).exec();
 
-            if(result[0].contrasenaNueva===true){
-                res.status(200).json({message : "Necesitas cambiar tu contraseña" , Status : 500, contrasenaNueva:true, rol:result[0].rol});
+            if(result.contrasenaNueva===true){
+                res.status(200).json({message : "Necesitas cambiar tu contraseña" , Status : 500, contrasenaNueva:true, rol:result.rol, sistemas:result.sistemas});
             }else{
-                res.status(200).json({message : "Tu contraseña está al día." , Status : 200, contrasenaNueva:false, rol:result[0].rol});
+                res.status(200).json({message : "Tu contraseña está al día." , Status : 200, contrasenaNueva:false, rol:result.rol, sistemas:result.sistemas});
             }
 
 
