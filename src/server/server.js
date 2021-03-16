@@ -1499,7 +1499,7 @@ app.post('/getCatalogsMunicipiosPorEstado',async (req,res)=>{
         if(code.code == 401){
             res.status(401).json({code: '401', message: code.message});
         }else if (code.code == 200 ){
-            //console.log({docType: docType, cve_ent : objEstado.clave });
+            console.log({docType: docType, cve_ent : objEstado.clave });
             const result = await Catalog.find({docType: docType, cve_ent :  objEstado.clave }).then();
             let objResponse= {};
             let strippedRows;
@@ -1536,7 +1536,7 @@ app.post('/getCatalogsLocalidadesPorEstado',async (req,res)=>{
         if(code.code == 401){
             res.status(401).json({code: '401', message: code.message});
         }else if (code.code == 200 ){
-            //console.log({docType: docType, cve_ent : objMunicipio.clave });
+            console.log({docType: docType, cve_ent : objMunicipio.clave });
             const result = await Catalog.find({docType: docType, cve_mun :  objMunicipio.clave }).then();
             let objResponse= {};
             let strippedRows;
