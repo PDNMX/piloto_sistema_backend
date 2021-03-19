@@ -584,7 +584,7 @@ app.post('/create/user',async (req,res)=>{
                   constrasena : password,
                   sistemas : newBody.sistemas,
                   proveedorDatos : newBody.proveedorDatos,
-                  estatus : newBody.estatus,
+                  estatus : true,
                   fechaAlta:newBody.fechaAlta,
                   vigenciaContrasena: newBody.vigenciaContrasena,
                   rol: "2"
@@ -606,12 +606,12 @@ app.post('/create/user',async (req,res)=>{
                 });
 
                 const message = {
-                    text: 'Enviamos tu nueva contraseña del portal PDN',
+                    text: 'Bienvenido al Sistema de Carga de datos S2 y S3',
                     from: 'soporteportalpdn@gmail.com',
                     to: newBody.correoElectronico,
-                    subject: 'Enviamos tu nueva contraseña del portal PDN',
+                    subject: 'Bienvenido al Sistema de Carga de datos S2 y S3',
                     attachment: [
-                        { data: '<html>Buen día anexamos tu contraseña nueva para acceder al portal de la PDN. Contraseña:  <br><i><b><h3>'+password+'</h3></b></i></html>', alternative: true }
+                        { data: '<html>Te enviamos tu contraseña para que puedas acceder al sistema, recuerda que debes cambiarla inmediatemente.<br><i><b><h3> Contraseña: '+password+'</h3></b></i></html>', alternative: true }
                     ],
                 };
 
@@ -1398,7 +1398,7 @@ app.post('/getProviders',async (req,res)=>{
         if(code.code == 401){
             res.status(401).json({code: '401', message: code.message});
         }else if (code.code == 200 ) {
-            const result = await Provider.find({fechaBaja: null}).then();
+            const result = await Provider.find({fechaBaja: null, estatus:true}).then();
             let objResponse = {};
 
             try {
@@ -1582,20 +1582,73 @@ app.post('/getBitacora',async (req,res)=>{
             let page = req.body.page === undefined ? 1 : req.body.page ;  //numero de pagina a mostrar
             let pageSize = req.body.pageSize === undefined ? 10 : req.body.pageSize;
             let query = req.body.query === undefined ? {} : req.body.query;
-            console.log({page :page , limit: pageSize, sort: sortObj});
+
             if(((typeof req.body.sistema!="undefined")) && ((typeof req.body.usuarioBitacora !="undefined"))){
-                var paginationResult = await Bitacora.find({fechaOperacion: { $gte: fechaInicial, $lte : fechaFinal }, usuario: { $eq : req.body.usuarioBitacora }, sistema: { $in : req.body.sistema }});
-                formato(paginationResult);
+                var paginationResult = await Bitacora.aggregate([
+                    {
+                        $lookup: {
+                            from: "usuarios",
+                            localField:  "usuario" ,
+                            foreignField: "_id",
+                            as: "Data"
+                        }
+                    },
+                    {
+                        $match: {
+                            "fechaOperacion": {  $gte: fechaInicial, $lte : fechaFinal },
+                            "sistema": { $in : req.body.sistema }}
+                    }]);
+                var us=await User.findById(req.body.usuarioBitacora);
+                var arrusuarios=[];
+                _.map(paginationResult, function (item) {
+                    if(item.usuario==req.body.usuarioBitacora){
+                        arrusuarios.push({"tipoOperacion":item.tipoOperacion,"fechaOperacion":item.fechaOperacion,"sistema":item.sistema,"numeroRegistros":item.numeroRegistros, "usuario":item.usuario, "Data":[{"nombre":us.nombre,"apellidoUno":us.apellidoUno,"apellidoDos":us.apellidoDos}]});
+                    }
+                });
+                paginationResult=arrusuarios;
             }else if((typeof req.body.sistema!="undefined")){
-                var paginationResult = await Bitacora.find({fechaOperacion: { $gte: fechaInicial, $lte : fechaFinal },sistema: {$in : req.body.sistema }});
-                formato(paginationResult);
+                var paginationResult = await Bitacora.aggregate([
+                    {
+                        $lookup: {
+                            from: "usuarios",
+                            localField:  "usuario" ,
+                            foreignField: "_id",
+                            as: "Data"
+                        }
+                    },
+                    {
+                        $match: {
+                            "fechaOperacion": {  $gte: fechaInicial, $lte : fechaFinal },
+                            "sistema": { $in : req.body.sistema }}
+                    }]);
+
             }else if((typeof req.body.usuarioBitacora!="undefined")){
-                var paginationResult = await Bitacora.find({fechaOperacion: { $gte: fechaInicial, $lte :fechaFinal }, usuario: { $eq : req.body.usuarioBitacora}});
-                formato(paginationResult);
+                var paginationResult = await Bitacora.find({fechaOperacion: { $gte: fechaInicial, $lte :fechaFinal }});
+                var us=await User.findById(req.body.usuarioBitacora);
+                var arrusuarios=[];
+                _.map(paginationResult, function (item) {
+                    if(item.usuario==req.body.usuarioBitacora){
+                        arrusuarios.push({"tipoOperacion":item.tipoOperacion,"fechaOperacion":item.fechaOperacion,"sistema":item.sistema,"numeroRegistros":item.numeroRegistros, "usuario":item.usuario, "Data":[{"nombre":us.nombre,"apellidoUno":us.apellidoUno,"apellidoDos":us.apellidoDos}]});
+                    }
+                });
+                paginationResult=arrusuarios;
             }else{
-                var paginationResult = await Bitacora.find({fechaOperacion: { $gte: fechaInicial, $lte : fechaFinal }});
-                formato(paginationResult);
+
+                var paginationResult = await Bitacora.aggregate([
+                    {
+                        $lookup: {
+                            from: "usuarios",
+                            localField:  "usuario" ,
+                            foreignField: "_id",
+                            as: "Data"
+                        }
+                    },
+                    {
+                        $match: { "fechaOperacion": {  $gte: fechaInicial, $lte : fechaFinal } }
+                    }]);
             }
+
+            formato(paginationResult)
 
             function formato(paginationResult){
                 moment.locale('es');
@@ -1628,7 +1681,12 @@ app.post('/getBitacora',async (req,res)=>{
                         tipo="Consulta";
                     }
 
-                    let rowExtend = _.extend({fecha: fecha,tipo:tipo, sistema_label:sistema_label}, row.toObject());
+                    var nombre_usuario="";
+                    _.map(row.Data, function (item) {
+                        nombre_usuario=item.nombre+" "+item.apellidoUno+" "+item.apellidoDos;
+                    });
+
+                    let rowExtend = _.extend({fecha: fecha,tipo:tipo, sistema_label:sistema_label,numeroRegistros:row.numeroRegistros, nombre:nombre_usuario});
                     return rowExtend;
                 });
 
@@ -1693,12 +1751,12 @@ app.post('/resetpassword',async (req,res)=>{
         });
 
         const message = {
-            text: 'Enviamos tu nueva contraseña del portal PDN',
+            text: ' Bienvenido al Sistema de Carga de datos S2 y S3',
             from: 'soporteportalpdn@gmail.com',
             to: correo,
-            subject: 'Enviamos tu nueva contraseña del portal PDN',
+            subject: ' Bienvenido al Sistema de Carga de datos S2 y S3',
             attachment: [
-                { data: '<html>Buen día anexamos tu contraseña nueva para acceder al portal de la PDN. Contraseña:  <br><i><b><h3>'+password+'</h3></b></i></html>', alternative: true }
+                { data: '<html>Te enviamos tu contraseña para que puedas acceder al sistema, recuerda que debes cambiarla inmediatemente. <br><i><b><h3>Contraseña:'+password+'</h3></b></i></html>', alternative: true }
             ],
         };
 
