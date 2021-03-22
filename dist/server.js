@@ -93,7 +93,7 @@
 /*! no static exports found */
 /***/ (function(module, exports, __webpack_require__) {
 
-eval("var _require = __webpack_require__(/*! mongoose */ \"mongoose\"),\n    Schema = _require.Schema,\n    model = _require.model;\n\nvar mongoosePaginate = __webpack_require__(/*! mongoose-paginate-v2 */ \"mongoose-paginate-v2\");\n\nvar bitacoraSchema = new Schema({\n  tipoOperacion: String,\n  fechaOperacion: String,\n  usuario: String,\n  numeroRegistros: Number,\n  sistema: String\n});\nbitacoraSchema.plugin(mongoosePaginate);\nvar Bitacora = model('Bitacora', bitacoraSchema, 'bitacora');\nmodule.exports = Bitacora;\n\n//# sourceURL=webpack:///./src/server/schemas/model.bitacora.js?");
+eval("var _require = __webpack_require__(/*! mongoose */ \"mongoose\"),\n    Schema = _require.Schema,\n    model = _require.model;\n\nvar mongoosePaginate = __webpack_require__(/*! mongoose-paginate-v2 */ \"mongoose-paginate-v2\");\n\nvar mongoose = __webpack_require__(/*! mongoose */ \"mongoose\");\n\nvar bitacoraSchema = new Schema({\n  tipoOperacion: String,\n  fechaOperacion: String,\n  usuario: mongoose.ObjectId,\n  numeroRegistros: Number,\n  sistema: {\n    type: [],\n    default: void 0\n  }\n});\nbitacoraSchema.plugin(mongoosePaginate);\nvar Bitacora = model('Bitacora', bitacoraSchema, 'bitacora');\nmodule.exports = Bitacora;\n\n//# sourceURL=webpack:///./src/server/schemas/model.bitacora.js?");
 
 /***/ }),
 
