@@ -612,6 +612,7 @@ app.post('/create/user',async (req,res)=>{
                     subject: 'Bienvenido al Sistema de Carga de datos S2 y S3',
                     attachment: [
                         { data: '<html>Te enviamos tu contraseña para que puedas acceder al sistema, recuerda que debes cambiarla inmediatemente.<br><i><b><h3> Contraseña: '+password+'</h3></b></i></html>', alternative: true }
+
                     ],
                 };
 
@@ -903,7 +904,6 @@ app.post('/listSchemaS3S',async (req,res)=> {
             let pageSize = req.body.pageSize === undefined ? 10 : req.body.pageSize;
             let query = req.body.query === undefined ? {} : req.body.query;
 
-            //console.log({page :page , limit: pageSize, sort: sortObj, query: query});
             const paginationResult = await sancionados.paginate(query, {page :page , limit: pageSize, sort: sortObj}).then();
             let objpagination ={hasNextPage : paginationResult.hasNextPage, page:paginationResult.page, pageSize : paginationResult.limit, totalRows: paginationResult.totalDocs }
             let objresults = paginationResult.docs;
@@ -1016,7 +1016,6 @@ app.delete('/deleteRecordS2',async (req,res)=>{
     }
 
 });
-
 
 app.delete('/deleteRecordS3S',async (req,res)=>{
     try {
@@ -1771,31 +1770,31 @@ app.post('/resetpassword',async (req,res)=>{
         const respuesta= await User.updateOne({correoElectronico: correo },{constrasena: password ,contrasenaNueva:true,vigenciaContrasena : fechaActual.add(3 , 'months').format().toString()});
         res.status(200).json({message : "Se ha enviado tu nueva contraseña al correo electrónico proporcionado." , Status : 200});
 
-        }catch (e) {
-        console.log(e);
-    }
-});
-
-app.post('/changepassword',async (req,res)=>{
-    try {
-        let constrasena= req.body.constrasena;
-        let passwordConfirmation= req.body.passwordConfirmation;
-        let id= req.body.user;
-
-        if(constrasena!=passwordConfirmation){
-            res.status(200).json({message : "Las contraseñas no coinciden." , Status : 500});
-            return false;
-        }
-        let fechaActual = moment();
-
-
-        const result = await User.update({_id:id},{constrasena: constrasena,contrasenaNueva:false,  vigenciaContrasena : fechaActual.add(3 , 'months').format().toString()}).then();
-        res.status(200).json({message : "¡Se ha actualizado tu contraseña!.Favor de cerrar la sesión e iniciar nuevamente." , Status : 200});
-
     }catch (e) {
         console.log(e);
     }
 });
+
+        app.post('/changepassword',async (req,res)=>{
+                try {
+                    let constrasena= req.body.constrasena;
+                    let passwordConfirmation= req.body.passwordConfirmation;
+                    let id= req.body.user;
+
+                    if(constrasena!=passwordConfirmation){
+                        res.status(200).json({message : "Las contraseñas no coinciden." , Status : 500});
+                        return false;
+                    }
+                    let fechaActual = moment();
+
+
+                    const result = await User.update({_id:id},{constrasena: constrasena,contrasenaNueva:false,  vigenciaContrasena : fechaActual.add(3 , 'months').format().toString()}).then();
+                    res.status(200).json({message : "¡Se ha actualizado tu contraseña!.Favor de cerrar la sesión e iniciar nuevamente." , Status : 200});
+
+                }catch (e) {
+                    console.log(e);
+                }
+            });
 
 app.post('/validationpassword',async (req,res)=>{
     var code = validateToken(req);
