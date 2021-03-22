@@ -1602,7 +1602,7 @@ app.post('/getBitacora',async (req,res)=>{
                 var arrusuarios=[];
                 _.map(paginationResult, function (item) {
                     if(item.usuario==req.body.usuarioBitacora){
-                        arrusuarios.push({"tipoOperacion":item.tipoOperacion,"fechaOperacion":item.fechaOperacion,"sistema":item.sistema,"numeroRegistros":item.numeroRegistros, "usuario":item.usuario, "Data":[{"nombre":us.nombre,"apellidoUno":us.apellidoUno,"apellidoDos":us.apellidoDos}]});
+                        arrusuarios.push({"tipoOperacion":item.tipoOperacion,"fechaOperacion":item.fechaOperacion,"sistema":item.sistema,"numeroRegistros":item.numeroRegistros, "idUsuario":item.usuario, "Data":[{"usuario":us.usuario}]});
                     }
                 });
                 paginationResult=arrusuarios;
@@ -1628,7 +1628,7 @@ app.post('/getBitacora',async (req,res)=>{
                 var arrusuarios=[];
                 _.map(paginationResult, function (item) {
                     if(item.usuario==req.body.usuarioBitacora){
-                        arrusuarios.push({"tipoOperacion":item.tipoOperacion,"fechaOperacion":item.fechaOperacion,"sistema":item.sistema,"numeroRegistros":item.numeroRegistros, "usuario":item.usuario, "Data":[{"nombre":us.nombre,"apellidoUno":us.apellidoUno,"apellidoDos":us.apellidoDos}]});
+                        arrusuarios.push({"tipoOperacion":item.tipoOperacion,"fechaOperacion":item.fechaOperacion,"sistema":item.sistema,"numeroRegistros":item.numeroRegistros, "idUsuario":item.usuario, "Data":[{"usuario":us.usuario}]});
                     }
                 });
                 paginationResult=arrusuarios;
@@ -1683,7 +1683,7 @@ app.post('/getBitacora',async (req,res)=>{
 
                     var nombre_usuario="";
                     _.map(row.Data, function (item) {
-                        nombre_usuario=item.nombre+" "+item.apellidoUno+" "+item.apellidoDos;
+                        nombre_usuario=item.usuario;
                     });
 
                     let rowExtend = _.extend({fecha: fecha,tipo:tipo, sistema_label:sistema_label,numeroRegistros:row.numeroRegistros, nombre:nombre_usuario});
